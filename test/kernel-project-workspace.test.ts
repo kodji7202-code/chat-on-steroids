@@ -3,7 +3,19 @@ import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 const project = vi.hoisted(() => vi.fn());
 vi.mock('../src/main/projects.js', () => ({ getSessionProject: project }));
 const swarm = vi.hoisted(() => ({ running: false }));
-vi.mock('../src/main/agents.js', async (original) => ({ ...(await original<typeof import('../src/main/agents.js')>()), swarmRunning: () => swarm.running }));
+const brokerRun = vi.hoisted(() => vi.fn());
+const brokerManaged = vi.hoisted(() => vi.fn());
+vi.mock('../src/main/agents.js', async (original) => ({
+  ...(await original<typeof import('../src/main/agents.js')>()),
+  swarmRunning: () => swarm.running,
+  currentRunForCaller: brokerRun,
+  managedWorkerWorktreeRequired: brokerManaged
+}));
+const managedWorktree = vi.hoisted(() => vi.fn());
+vi.mock('../src/main/worktrees/index.js', async (original) => ({
+  ...(await original<typeof import('../src/main/worktrees/index.js')>()),
+  lookupWorkerWorkspace: managedWorktree
+}));
 import { resolveCwd, resolveIn } from '../src/main/mcp/kernel.js';
 import { emptyEvidence, runInCallContext, type CallContext } from '../src/main/mcp/call-context.js';
 import { resetWorkspaces, setWorkspaceFor } from '../src/main/workspace.js';
@@ -12,7 +24,7 @@ import { makeTempDir, removeTempDir, writeTree } from './helpers.js';
 let base = '';
 beforeAll(async () => { base = await makeTempDir(); await writeTree(base, { 'a/file.txt': 'a', 'b/file.txt': 'b' }); });
 afterAll(async () => { await removeTempDir(base); });
-beforeEach(() => { resetWorkspaces(); project.mockReset(); swarm.running = false; });
+beforeEach(() => { resetWorkspaces(); project.mockReset(); managedWorktree.mockReset(); managedWorktree.mockReturnValue(null); brokerRun.mockReset(); brokerRun.mockReturnValue(null); brokerManaged.mockReset(); brokerManaged.mockReturnValue(false); swarm.running = false; });
 function run<T>(id: string, fn: () => T): T {
   const context: CallContext = { startedAt: Date.now(), transportKey: null, agent: 'prime', caller: { transportKey: null, requestId: null, conversationId: `chat-${id}`, sessionId: id }, outcome: null, evidence: emptyEvidence() };
   return runInCallContext(context, fn);
@@ -31,6 +43,32 @@ it('keeps the explicit project authoritative over learned cwd and revalidates it
   project.mockRejectedValue(new Error('The session project is unavailable'));
   await expect(run('a', () => resolveIn(roots(), '/work/b/file.txt'))).rejects.toThrow('project is unavailable');
   await expect(run('a', () => resolveCwd({ roots: roots(), caps: defaultConfig().capabilities, readOnly: false }, undefined))).rejects.toThrow('project is unavailable');
+});
+it('prefers a proven isolated worker worktree over the Local Project inherited from its prime', async () => {
+  project.mockResolvedValue({ virtual: '/work/a', real: path.join(base, 'a') });
+  const runId = '22222222-2222-4222-8222-222222222222';
+  brokerRun.mockReturnValue(runId);
+  managedWorktree.mockReturnValue({ workspace: { virtual: '/work/b', real: path.join(base, 'b') } });
+  const worker = <T>(fn: () => T): T => runInCallContext({
+    startedAt: Date.now(), transportKey: null, agent: 'worker-1',
+    caller: { transportKey: null, requestId: 'req-worker', conversationId: 'chat-worker', sessionId: 'a', runId },
+    outcome: null, evidence: emptyEvidence()
+  } satisfies CallContext, fn);
+  expect((await worker(() => resolveIn(roots(), 'file.txt'))).real).toBe(path.join(base, 'b', 'file.txt'));
+  expect((await worker(() => resolveCwd({ roots: roots(), caps: defaultConfig().capabilities, readOnly: false }, undefined))).virtual).toBe('/work/b');
+  expect(managedWorktree).toHaveBeenCalledWith({ runId, agentId: 'worker-1' });
+  expect(project).not.toHaveBeenCalled();
+});
+it('fails closed if a broker-persisted isolated worker loses its verified worktree after restart', async () => {
+  project.mockResolvedValue({ virtual: '/work/a', real: path.join(base, 'a') });
+  brokerRun.mockReturnValue('22222222-2222-4222-8222-222222222222');
+  brokerManaged.mockReturnValue(true);
+  await expect(runInCallContext({
+    startedAt: Date.now(), transportKey: null, agent: 'worker-1',
+    caller: { transportKey: null, requestId: 'req-worker', conversationId: 'chat-worker', sessionId: 'a' },
+    outcome: null, evidence: emptyEvidence()
+  } satisfies CallContext, () => resolveIn(roots(), 'file.txt'))).rejects.toThrow('WORKTREE_OWNER_UNAVAILABLE');
+  expect(project).not.toHaveBeenCalled();
 });
 it('retains the selected project after an absolute path learns a different directory', async () => {
   project.mockResolvedValue({ virtual: '/work/a', real: path.join(base, 'a') });

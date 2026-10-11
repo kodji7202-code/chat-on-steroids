@@ -9,7 +9,9 @@
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build": "electron-vite build && node scripts/build-mission-daemon.mjs",
+    "daemon:build": "node scripts/build-mission-daemon.mjs",
+    "daemon:cli": "node out/mission-daemon.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",

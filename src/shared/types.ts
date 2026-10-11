@@ -347,6 +347,8 @@ export interface MultiAgentSettings {
    * context that is about to change. Off by default; a chat with no workers is never held.
    */
   waitForSubAgents?: boolean;
+  /** Create a separate managed Git worktree for each newly invited coding worker. Opt-in. */
+  autoWorktrees?: boolean;
   /**
    * Reclaim only terminal processes owned by an exactly identified worker that has remained
    * sleeping beyond the runtime-retention threshold. Off by default; durable worker/chat

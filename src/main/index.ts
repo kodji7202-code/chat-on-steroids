@@ -88,6 +88,7 @@ import {
 } from './session/continuation.js';
 import { runShutdownSequence } from './shutdown.js';
 import { startAgentRuntimeGc, stopAgentRuntimeGc } from './runtime-gc.js';
+import { restoreManagedWorktrees } from './worktrees/index.js';
 import { applyStagedUpdate, startUpdateChecks } from './update.js';
 import { UI_BASE_ZOOM, windowLayoutForDisplays, windowPlacementWasMaximized, titleBarOverlayForTheme, windowBackgroundForTheme } from './window-layout.js';
 import { openInPreferredBrowser } from './browser.js';
@@ -498,6 +499,18 @@ void app.whenReady().then(async () => {
   // history; in the background, since startup does not wait on presentation.
   void archiveWorkerAssignments(savedSwarm);
   restoreSwarm(savedSwarm);
+  // Rebuild only marker-verified worker worktree leases before any restored worker can
+  // receive browser/MCP work. A user may turn isolation Off without retiring an older
+  // worker; already-isolated workers must still resolve to their original checkout.
+  if (getConfig().roots.length > 0) {
+    try {
+      const recovered = await restoreManagedWorktrees(getConfig().roots);
+      logInfo(`worktrees: restored ${recovered.restored.length} worker workspace(s); refused ${recovered.rejected.length} invalid marker(s)`);
+    } catch (error) {
+      logWarn(`worktrees: restore failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (windowActivation.isDisabled()) return;
+  }
   if (!getConfig().multiAgent.enabled) {
     // A feature toggle is a pause, not Clear swarm. Canonicalize any active incarnation left by
     // a crash into stopped prime-owned history before the bridge exists, then make that safer

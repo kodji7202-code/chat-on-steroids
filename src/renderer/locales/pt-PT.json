@@ -1478,6 +1478,8 @@
   "{0}: drag, click, or open the context menu": "{0}: arraste, clique ou abra o menu de contexto",
   "New response": "Nova resposta",
   "Wait for sub-agents": "Aguardar subagentes",
+  "Isolate new workers in Git worktrees": "Isolar novos trabalhadores em worktrees Git",
+  "When a worker is started for a Git project, give it a separate approved workspace and branch. Requires an approved parent folder. Existing workers are unaffected; integration into your branch requires review.": "Os novos trabalhadores de projetos Git recebem uma área de trabalho e um ramo separados e autorizados. É necessária uma pasta principal autorizada. Os trabalhadores existentes não mudam; a integração no seu ramo requer revisão.",
   "Waiting for this chat’s sub-agents": "A aguardar os subagentes deste chat",
   "Authentication": "Autenticação",
   "None or a static credential": "Nenhuma ou credencial estática",

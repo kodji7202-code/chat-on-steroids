@@ -525,6 +525,8 @@
   "Recover other chats’ tabs": "恢復其他聊天的分頁",
   "Restore missing or unresponsive work chats. Goal and Loop chats recover automatically.": "恢復遺失或無回應的工作聊天。目標和循環聊天會自動恢復。",
   "Wait for sub-agents": "等待子代理完成",
+  "Isolate new workers in Git worktrees": "在 Git 工作樹中隔離新工作代理",
+  "When a worker is started for a Git project, give it a separate approved workspace and branch. Requires an approved parent folder. Existing workers are unaffected; integration into your branch requires review.": "為 Git 專案的新工作代理配置獨立且已授權的工作區及分支。需要授權父資料夾。現有工作代理不受影響；整合至你的分支前必須經過審查。",
   "Waiting for this chat’s sub-agents": "正在等待此聊天的子代理",
   "Message ChatGPT": "給 ChatGPT 發訊息",
   "Add photos & files": "新增照片和檔案",

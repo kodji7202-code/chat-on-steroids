@@ -350,6 +350,8 @@
   "Recover other chats’ tabs": "恢复其他聊天的标签页",
   "Restore missing or unresponsive work chats. Goal and Loop chats recover automatically.": "恢复缺失或无响应的工作聊天。目标和循环聊天会自动恢复。",
   "Wait for sub-agents": "等待子代理完成",
+  "Isolate new workers in Git worktrees": "在 Git 工作树中隔离新工作代理",
+  "When a worker is started for a Git project, give it a separate approved workspace and branch. Requires an approved parent folder. Existing workers are unaffected; integration into your branch requires review.": "为 Git 项目的新工作代理分配单独且已授权的工作区和分支。需要授权父文件夹。现有工作代理不受影响；合并到你的分支前必须经过审查。",
   "Waiting for this chat’s sub-agents": "正在等待此聊天的子代理",
   "Message ChatGPT": "给 ChatGPT 发消息",
   "Add photos & files": "添加照片和文件",

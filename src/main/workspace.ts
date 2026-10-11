@@ -34,6 +34,8 @@ import { currentCall } from './mcp/call-context.js';
 import { requestCorrelation } from './session/correlation.js';
 import { isSkillPath, isSkillVirtualPath } from './skill-access.js';
 import { isContained } from './sandbox.js';
+import { lookupWorkerWorkspace } from './worktrees/index.js';
+import { currentRunForCaller, managedWorkerWorktreeRequired } from './agents.js';
 
 /** How long a learned workspace survives without being used or renewed. */
 const WORKSPACE_TTL_MS = 12 * 60 * 60 * 1000;
@@ -105,6 +107,25 @@ export function currentWorkspace(): Workspace | null {
   const keys = workspaceKeys();
   if (!keys.length) return null;
   prune();
+  // A worker's proven run+agent identity overrides the inherited prime workspace.
+  // This is especially important after an application restart: the original cwd map
+  // is ephemeral, while owned worktree markers are rebuilt before MCP admission.
+  // Ordinary read/edit/command calls do not carry a run_id tool argument. Resolve it
+  // from broker-owned conversation identity, never a model-authored string.
+  const runId = call?.agent?.startsWith('worker-') && call.caller.conversationId
+    ? currentRunForCaller({ ...call.caller, runId: undefined })
+    : null;
+  const ownedWorker = runId && call?.agent
+    ? lookupWorkerWorkspace({ runId, agentId: call.agent })
+    : null;
+  if (ownedWorker) {
+    const workspace: Workspace = { ...ownedWorker.workspace, at: Date.now() };
+    for (const key of keys) workspaces.set(key, { ...workspace });
+    return workspace;
+  }
+  if (call?.agent?.startsWith('worker-') && managedWorkerWorktreeRequired(call.caller)) {
+    throw new Error('WORKTREE_OWNER_UNAVAILABLE: this worker requires an isolated checkout, but its marker or approved parent could not be verified. Restore the worktree before using local files or commands.');
+  }
   let held: Workspace | null = null;
   for (const key of keys) {
     held = workspaces.get(key) ?? null;

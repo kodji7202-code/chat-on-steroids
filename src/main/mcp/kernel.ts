@@ -41,6 +41,7 @@ import {
   type Resolved
 } from '../sandbox.js';
 import { currentWorkspace, forgetMissingWorkspace, learnWorkspace, setCurrentWorkspace } from '../workspace.js';
+import { lookupWorkerWorkspace } from '../worktrees/index.js';
 import { getSessionProject } from '../projects.js';
 import { firstTaskRoot, resolveLinkedSkillAlias } from '../skill-access.js';
 import { isUserSkillVirtualPath, resolveUserSkillPath } from '../user-skills.js';
@@ -53,6 +54,7 @@ import {
   currentRunId,
   acknowledgeOffersForCaller,
   currentRunForCaller,
+  managedWorkerWorktreeRequired,
   agentFamiliesForCaller,
   reconcileAgentRequestOwners,
   dormantWorkerNotice,
@@ -1252,7 +1254,25 @@ async function validatedWorkspace() {
 
 /** The workspace, plus the virtual path of a learned one just dropped because its folder is gone. */
 async function liveWorkspace(): Promise<{ workspace: { virtual: string; real: string } | null; missing: string | null }> {
-  const sessionId = currentCall()?.caller.sessionId;
+  const call = currentCall();
+  const sessionId = call?.caller.sessionId;
+  // A worker session intentionally inherits the prime's Local Project metadata, but that
+  // presentation grouping must not override a separately allocated worker checkout.
+  // The broker-proven run/agent pair is stronger than the inherited project association.
+  // `currentWorkspace` recovers the exact marker-owned worktree after process restart.
+  const runId = call?.agent?.startsWith('worker-') && call.caller.conversationId
+    ? currentRunForCaller({ ...call.caller, runId: undefined })
+    : null;
+  const managedWorker = runId && call?.agent
+    ? lookupWorkerWorkspace({ runId, agentId: call.agent })
+    : null;
+  if (managedWorker) {
+    setCurrentWorkspace(managedWorker.workspace);
+    return { workspace: managedWorker.workspace, missing: null };
+  }
+  if (call?.agent?.startsWith('worker-') && managedWorkerWorktreeRequired(call.caller)) {
+    throw new Error('WORKTREE_OWNER_UNAVAILABLE: the worker\'s required isolated worktree is unavailable or could not be verified. Relative file and command operations are blocked instead of using the prime\'s project.');
+  }
   // Explicit project bindings are durable authority, even after a cwd was learned.
   // Validate first so a revoked or moved project never becomes a first-root fallback.
   const project = sessionId ? await getSessionProject(sessionId) : null;

@@ -893,6 +893,8 @@ export function isReasoningEffort(value: unknown): value is ReasoningEffort {
 }
 
 export interface AgentInfo {
+  /** Broker-persisted expectation: a managed Git worktree MUST resolve for this worker. */
+  managedWorktree?: boolean;
   /** Broker owner projection. IDs such as worker-1 are local to this incarnation. */
   runId?: string;
   primeConversationId?: string;

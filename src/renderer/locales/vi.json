@@ -328,6 +328,8 @@
   "Recover other chats’ tabs": "Khôi phục tab của các cuộc trò chuyện khác",
   "Restore missing or unresponsive work chats. Goal and Loop chats recover automatically.": "Khôi phục cuộc trò chuyện công việc bị thiếu hoặc không phản hồi. Cuộc trò chuyện Goal và Loop tự khôi phục.",
   "Wait for sub-agents": "Chờ tác nhân phụ",
+  "Isolate new workers in Git worktrees": "Cô lập worker mới trong Git worktree",
+  "When a worker is started for a Git project, give it a separate approved workspace and branch. Requires an approved parent folder. Existing workers are unaffected; integration into your branch requires review.": "Worker mới trong dự án Git nhận không gian làm việc và nhánh riêng đã được cho phép. Cần cấp quyền cho thư mục cha. Worker hiện có không thay đổi; việc hợp nhất vào nhánh của bạn cần được xem xét.",
   "Waiting for this chat’s sub-agents": "Đang chờ tác nhân phụ của cuộc trò chuyện này",
   "Message ChatGPT": "Nhắn ChatGPT",
   "Add photos & files": "Thêm ảnh & tệp",

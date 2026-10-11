@@ -16,6 +16,12 @@ changed lines before applying an older patch. Document the work and its actual v
 **Reading order:** §§1–3 product/identities/evidence; §4 owners; §§5–18 feature contracts;
 §19 debugging/tests; §§20–22 shipping, known gaps and completion.
 
+**Opt-in mission runtime extension:** See `docs/mission-runtime.md` for worker-owned Git
+worktrees, broker-backed worktree restoration, strict internal quality receipts, reversible
+code checkpoints and the independent scheduled-jobs daemon. A checkpoint of task progress is
+not a snapshot of project files. This extension keeps the existing agent/outbox permission
+owners; the Review UI and CLI have separate, explicitly documented capability limits.
+
 **Meaning of the text.** “Intent” and “must” describe the behavior to preserve or achieve.
 “Current” describes the checked implementation. A bug does not become product policy because
 the code currently does it. Known implementation gaps are collected in §21 instead of being

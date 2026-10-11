@@ -35,6 +35,9 @@ run(node, ['scripts/make-icon.mjs']);
 // extension both read this one file to tell which extension build a browser is running.
 run(node, ['scripts/write-extension-stamp.mjs']);
 run(node, [path.join('node_modules', 'electron-vite', 'bin', 'electron-vite.js'), 'build']);
+// The opt-in job runtime is an independent Node entry shipped alongside Electron's
+// main bundle. Packaging must not depend on a developer having built it manually.
+run(node, ['scripts/build-mission-daemon.mjs']);
 
 for (const arch of arches) {
   const targetArgs = ['--platform', platform, '--arch', arch];

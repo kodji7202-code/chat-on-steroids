@@ -1532,6 +1532,8 @@
   "Use ChatGPT’s current model": "Usar o modelo atual do ChatGPT",
   "Use an exact command or a trailing standalone * for additional arguments. Compound shell syntax is rejected. Allowed programs and their child processes remain trusted; this is not an OS sandbox.": "Use um comando exato ou um * isolado no final para argumentos adicionais. Sintaxe composta de shell é rejeitada. Os programas permitidos e os processos filhos deles continuam confiáveis; isto não é um sandbox do sistema operacional.",
   "Wait for sub-agents": "Aguardar os subagentes",
+  "Isolate new workers in Git worktrees": "Isolar novos workers em worktrees do Git",
+  "When a worker is started for a Git project, give it a separate approved workspace and branch. Requires an approved parent folder. Existing workers are unaffected; integration into your branch requires review.": "Novos workers de projetos Git recebem um workspace e uma branch separados e aprovados. É necessária uma pasta superior aprovada. Os workers existentes não mudam; a integração à sua branch exige revisão.",
   "Waiting for this chat’s sub-agents": "Aguardando os subagentes deste chat",
   "Workers cannot run their own Goal/Loop. Enable continuation in the parent chat instead.": "Workers não podem executar o próprio Goal/Loop. Ative a continuação no chat principal.",
   "bound": "vinculado",

@@ -328,6 +328,8 @@
   "Recover other chats’ tabs": "Tabs anderer Chats wiederherstellen",
   "Restore missing or unresponsive work chats. Goal and Loop chats recover automatically.": "Stellt fehlende oder nicht reagierende Arbeits-Chats wieder her. Goal- und Loop-Chats werden automatisch wiederhergestellt.",
   "Wait for sub-agents": "Auf Unteragenten warten",
+  "Isolate new workers in Git worktrees": "Neue Worker in Git-Worktrees isolieren",
+  "When a worker is started for a Git project, give it a separate approved workspace and branch. Requires an approved parent folder. Existing workers are unaffected; integration into your branch requires review.": "Neue Worker in Git-Projekten erhalten einen eigenen freigegebenen Arbeitsbereich und Branch. Dafür muss ein übergeordneter Ordner freigegeben sein. Bestehende Worker bleiben unverändert; die Übernahme in deinen Branch erfordert eine Prüfung.",
   "Waiting for this chat’s sub-agents": "Warte auf die Unteragenten dieses Chats",
   "Message ChatGPT": "Nachricht an ChatGPT",
   "Add photos & files": "Fotos & Dateien hinzufügen",

@@ -4836,6 +4836,7 @@ export function chatSettingsPatch(current: Config): {
       strictChatAllowlist: $<HTMLInputElement>('strictChatAllowlist').checked,
       recoverAgentTabs: $<HTMLInputElement>('recoverAgentTabs').checked,
       waitForSubAgents: $<HTMLInputElement>('waitForSubAgents').checked,
+      autoWorktrees: $<HTMLInputElement>('autoWorktrees').checked,
       endSleepingWorkerProcesses: $<HTMLInputElement>('endSleepingWorkerProcesses').checked
     },
     goal: {
@@ -5240,6 +5241,7 @@ const CHAT_INPUTS = [
   'strictChatAllowlist',
   'recoverAgentTabs',
   'waitForSubAgents',
+  'autoWorktrees',
   'endSleepingWorkerProcesses',
   'autoContinue',
   'goalProvider',
@@ -5335,6 +5337,11 @@ export function chatApply(state: AppState, previous?: Config): void {
     $<HTMLInputElement>('waitForSubAgents'),
     config.multiAgent.waitForSubAgents === true,
     previous?.multiAgent.waitForSubAgents
+  );
+  applyChatChecked(
+    $<HTMLInputElement>('autoWorktrees'),
+    config.multiAgent.autoWorktrees === true,
+    previous?.multiAgent.autoWorktrees
   );
   applyChatChecked(
     $<HTMLInputElement>('endSleepingWorkerProcesses'),

@@ -33,7 +33,10 @@ import {
 } from '../codex/view-image.js';
 import { logInfo, logWarn } from '../logger.js';
 import { SandboxError, isAbsoluteVirtualPath, isNativeWindowsPath, resolvePath, strayVirtualPath } from '../sandbox.js';
-import { currentWorkspace } from '../workspace.js';
+import { currentWorkspace, primeWorkspace, setWorkspaceFor } from '../workspace.js';
+import { isGitRepository } from '../toolchain.js';
+import { allocWorkerWorkspace, finalizeWorkerWorkspace, type WorkerWorktreeLease } from '../worktrees/index.js';
+import { markStagedWorkerWorktree } from '../agents.js';
 import type { Capabilities, Root } from '../../shared/types.js';
 import { commandHasSameArguments, evaluateCommandAllowlist } from '../../shared/command-allowlist.js';
 import type { FileChange } from '../../shared/session.js';
@@ -1355,8 +1358,50 @@ function registerAgentsTool(reg: SurfaceRegistrar): void {
             context: input.context ?? null,
             caller: await callerNow(startedAt, { exact: true, runId: input.run_id })
           });
-          await acceptAgentMutation(staged,
-            'The worker run could not cross its durable acceptance barrier. The spawn was rolled back; retry this same request.');
+          // Opt-in worker filesystem isolation belongs to the same staged spawn transaction.
+          // Create only for truly new invitations; a retried spawn or a sleeping worker must
+          // keep its existing workspace and must never receive a second Git branch.
+          const allocated: WorkerWorktreeLease[] = [];
+          const isolationNotes: string[] = [];
+          try {
+            if (getConfig().multiAgent.autoWorktrees === true) {
+              const source = primeWorkspace(currentCaller().conversationId) ?? currentWorkspace();
+              if (!source) throw new Error('WORKTREE_SOURCE_REQUIRED: choose a project/workspace before enabling automatic worker isolation.');
+              if (isGitRepository(source.real)) {
+                if (reg.ctx.readOnly || !reg.caps.command || !reg.caps.create || !reg.caps.edit) {
+                  throw new Error('WORKTREE_PERMISSION_REQUIRED: worker isolation needs Command, Create and Edit enabled, with Read-only off.');
+                }
+                for (const worker of staged.created) {
+                  if (worker.state !== 'invited') continue;
+                  const lease = await allocWorkerWorkspace({
+                    runId: staged.runId,
+                    agentId: worker.id,
+                    primeWorkspace: source,
+                    approvedRoots: getConfig().roots
+                  });
+                  allocated.push(lease);
+                  markStagedWorkerWorktree(staged.runId, worker.id);
+                  setWorkspaceFor(`agent:${staged.runId}:${worker.id}`, lease.workspace);
+                }
+                if (!getConfig().multiAgent.autoWorktrees) {
+                  throw new Error('WORKTREE_POLICY_CHANGED: worker isolation was disabled during allocation.');
+                }
+                isolationNotes.push(`${allocated.length} new worker(s) received isolated Git worktrees; inspect/review their branches before integration.`);
+              } else {
+                isolationNotes.push('This workspace is not a Git repository; no worker worktrees were created.');
+              }
+            }
+            await acceptAgentMutation(staged,
+              'The worker run could not cross its durable acceptance barrier. The spawn was rolled back; retry this same request.');
+          } catch (error) {
+            staged.rollback();
+            // A failed spawn has never exposed these branches to workers. Only remove exact
+            // marker-owned clean allocations, retaining anything that unexpectedly changed.
+            await Promise.allSettled(allocated.map(lease => finalizeWorkerWorkspace({
+              lease, reason: 'failed', branch: { mode: 'discard' }
+            })));
+            throw error;
+          }
           const { created, becamePrime, runId, defaultNotes } = staged;
           if (currentCall()) currentCall()!.caller.runId = runId;
           // Browser tabs are a publication side effect, never part of planning. They become
@@ -1374,6 +1419,7 @@ function registerAgentsTool(reg: SurfaceRegistrar): void {
                   `${created.length} worker(s) matched: ${created.map((info) => `${info.id} (${info.label}, ${info.state}${info.model ? `, model ${info.model}` : ''}${info.reasoningEffort ? `, reasoning ${info.reasoningEffort}` : ''})`).join(', ')}. ` +
                   (invited.length > 0 ? 'New worker chats are opening with their briefs already in them. ' : '') +
                   (defaultNotes?.length ? `${defaultNotes.join(' ')} ` : '') +
+                  (isolationNotes.length ? `${isolationNotes.join(' ')} ` : '') +
                   (sleeping.length > 0
                     ? `${sleeping.map((worker) => worker.id).join(', ')} already finished that earlier piece and is sleeping in its existing chat; wake it with action=message instead of spawning a duplicate. `
                     : '') +

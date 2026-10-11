@@ -1532,6 +1532,8 @@
   "Use ChatGPT’s current model": "ChatGPT의 현재 모델 사용",
   "Use an exact command or a trailing standalone * for additional arguments. Compound shell syntax is rejected. Allowed programs and their child processes remain trusted; this is not an OS sandbox.": "정확한 명령 또는 추가 인수를 허용하는 끝의 독립된 *를 사용하세요. 복합 셸 문법은 거부됩니다. 허용된 프로그램과 그 자식 프로세스는 계속 신뢰됩니다. 이는 OS 샌드박스가 아닙니다.",
   "Wait for sub-agents": "서브에이전트 대기",
+  "Isolate new workers in Git worktrees": "새 워커를 Git 워크트리로 격리",
+  "When a worker is started for a Git project, give it a separate approved workspace and branch. Requires an approved parent folder. Existing workers are unaffected; integration into your branch requires review.": "Git 프로젝트의 새 워커에게 승인된 별도 작업 공간과 브랜치를 할당합니다. 승인된 상위 폴더가 필요합니다. 기존 워커는 변경되지 않으며, 브랜치에 통합하려면 검토가 필요합니다.",
   "Waiting for this chat’s sub-agents": "이 채팅의 서브에이전트 대기 중",
   "Workers cannot run their own Goal/Loop. Enable continuation in the parent chat instead.": "워커는 자체 Goal/Loop를 실행할 수 없습니다. 대신 상위 채팅에서 계속하기를 켜세요.",
   "bound": "연결됨",

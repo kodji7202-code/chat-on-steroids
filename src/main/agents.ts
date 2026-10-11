@@ -1765,6 +1765,28 @@ export function stageSpawn(input: SpawnInput): StagedSpawn {
 }
 
 /**
+ * Marks a newly staged worker as requiring its marker-proven Git workspace. Persisted in
+ * the broker's existing critical spawn snapshot before the worker may open a ChatGPT tab.
+ * A missing or tampered worktree marker after restart must NOT silently fall back to the
+ * Local Project inherited from the prime.
+ */
+export function markStagedWorkerWorktree(runId: string, agentId: string): void {
+  const run = runs.get(runId);
+  const stage = run ? activeSpawnStages.get(run) : undefined;
+  const agent = stage?.created.find(worker => worker.info.id === agentId);
+  if (!stage || stage.settled || !agent || agent.info.role !== 'worker') {
+    throw new AgentError('WORKTREE_OWNER_NOT_STAGED: only a newly reserved worker may claim a managed worktree');
+  }
+  agent.info.managedWorktree = true;
+}
+
+/** True only for a broker-owned worker whose durable admission required a worktree. */
+export function managedWorkerWorktreeRequired(caller: Caller): boolean {
+  const member = resolve(caller);
+  return member?.info.role === 'worker' && member.info.managedWorktree === true;
+}
+
+/**
  * Publishes browser bootstraps only for worker ids that are still genuinely invited.
  *
  * Production MCP spawn uses this as the second half of its transaction: broker state is
@@ -5076,6 +5098,7 @@ function deserializeAgents(entries: readonly SerializedAgent[], savedAt: number)
     const agent: Agent = {
       info: {
         ...entry.info,
+        ...(entry.info.managedWorktree === true ? { managedWorktree: true } : {}),
         model: isModelSlug(entry.info.model) ? entry.info.model : null,
         reasoningEffort: isReasoningEffort(entry.info.reasoningEffort) ? entry.info.reasoningEffort : null,
         sleptAt: typeof entry.info.sleptAt === 'number' ? entry.info.sleptAt : null,

@@ -350,6 +350,8 @@
   "Recover other chats’ tabs": "ほかのチャットのタブを復旧",
   "Restore missing or unresponsive work chats. Goal and Loop chats recover automatically.": "作業用チャットのタブがなくなったり応答しなくなったりした場合に復旧します。ゴールとループのチャットは自動で復旧します。",
   "Wait for sub-agents": "サブエージェントの完了を待つ",
+  "Isolate new workers in Git worktrees": "新しいワーカーを Git ワークツリーで分離する",
+  "When a worker is started for a Git project, give it a separate approved workspace and branch. Requires an approved parent folder. Existing workers are unaffected; integration into your branch requires review.": "Git プロジェクトの新しいワーカーには、承認済みの独立した作業領域とブランチを割り当てます。承認済みの親フォルダーが必要です。既存のワーカーには影響せず、ブランチへの統合にはレビューが必要です。",
   "Waiting for this chat’s sub-agents": "このチャットのサブエージェントを待機中",
   "Message ChatGPT": "ChatGPT にメッセージを送る",
   "Add photos & files": "写真とファイルを追加",
