@@ -245,6 +245,7 @@ Paths in this section are repository-relative. Most mechanisms have `main`, `sha
 | Automation | `src/main/goal.ts`, `src/shared/{goal,goal-templates}.ts`: objectives, switches, obligations, provider/helper decisions. |
 | Agents | `src/main/agents.ts`, `src/renderer/{agent-panel,agent-communication}.ts`: independent prime families, staged mutations and addressed messages. |
 | Worker Git worktrees | `src/main/worktrees/`, `src/main/workspace.ts`: approved isolated checkouts, marker-verified ownership and exact worker workspace resolution. |
+| Quality checks | `src/main/quality-gate.ts`, `src/shared/quality-checks.ts`: a project's confirmed commands, run on a worker's exact checkout before its finish is accepted. |
 | Browser orchestration | `src/main/bridge.ts`, `browser.ts`, `browser-startup.ts`, `browser-wake.ts`, `browser-window-layout.ts`, `browser-preferences.ts`; `src/shared/browser-preferences.ts`. |
 | Built-in browser | `src/main/cos-browser/` (`selection.ts` opt-in loading, `index.ts` lifecycle, `host.ts` windows/tabs/extension/sign-in, `tab-model.ts`, `chrome-api.ts`, `extension-worker.ts`, `match-pattern.ts`, `sign-in.ts`, `sign-in-transfer.ts`); `src/preload/cos-browser{,-worker,-sign-in}.ts`; `src/renderer/cos-browser.{html,ts,css}` toolbar and `cos-browser-sign-in.{html,ts,css}` Google sign-in card; `src/shared/cos-browser-sites.ts`. See §13 Built-in browser. |
 | Extension | `extension/{manifest.json,chatgpt-dom.js,content.js,fiber.js,background.js,usage.js,overlay.css,popup.html,popup.css,popup.js}`: injection worlds, native observations/actions, journal and UI. |
@@ -956,6 +957,25 @@ that could be lost, default to Keep, and be shown before any destructive action.
 Missing, corrupt or conflicting marker/identity evidence must fail closed rather than silently
 resolve an isolated worker to the prime's project; reviewing changes and integrating branches
 remain explicit steps.
+
+**Quality checks (#1296).** A project may hold up to 8 check commands (project menu → Quality
+checks). They are plain argv lines, never shell syntax, and saving a non-empty list requires a
+main-process confirmation that names every command and defaults to Cancel; the renderer or a
+model cannot set them alone. When a worker of that project calls `agents action=finish`, the app
+runs the checks one at a time in the worker's own marker-verified worktree (never the Prime's
+checkout), revalidating the lease before each command. The run is anchored to the candidate's
+content identity: HEAD, index and the bytes of every changed tracked or untracked non-ignored
+file. A check that changes that identity fails the run, and a run's result applies only to the
+exact identity and command list it ran with. Finish waits briefly; while checks still run it is
+refused with their progress, and the worker calls finish again. The first failed run on a
+candidate refuses the finish with each failing command's exit status and output tail, so the
+worker can fix it. Finishing again on the same unchanged candidate is accepted and its report
+leads with an app-written failure line, so a worker is never stuck and the Prime never reads a
+failure as a pass. A passed run leads the report with the commands, the commit and whether
+uncommitted changes were included. A worker without a verified isolated worktree finishes with a
+"not run" line. Results are process-local; after a restart the checks run again. Checks prove
+only that these commands exited 0 on this candidate, not that its scripts are honest; the
+orphan sweep's app-owned finish never claims a check result.
 Compaction keeps local session/project identity and moves frontend workspace projection. A
 relative path without owned workspace fails; a workspace never grants permission by itself.
 An absolute approved path teaches an unresolved request its project. Subsequent relative paths
