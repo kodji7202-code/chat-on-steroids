@@ -16,6 +16,8 @@ export interface LocalProject {
    * this existed have one; it grants no filesystem permission.
    */
   chatgpt?: ChatgptProjectLink;
+  /** User-confirmed commands a worker's checkout must pass before its finish is accepted. */
+  qualityChecks?: string[];
 }
 
 /**

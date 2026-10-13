@@ -1747,12 +1747,15 @@ it('offers a new chat beside a project\'s menu, and its color as a submenu and r
   expect(button.getAttribute('aria-expanded')).toBe('true');
   const menu = w.document.querySelector<HTMLElement>('.row-menu')!;
   expect(menu.getAttribute('role')).toBe('menu');
-  expect([...menu.querySelectorAll<HTMLElement>('.row-menu-item')].map(item => item.dataset.rowAction)).toEqual(['color', 'remove']);
+  expect([...menu.querySelectorAll<HTMLElement>('.row-menu-item')].map(item => item.dataset.rowAction)).toEqual(['color', 'quality-checks', 'remove']);
   expect(menuItem(w, 'remove').classList.contains('is-danger')).toBe(true);
   expect(w.document.activeElement).toBe(menuItem(w, 'color'));
   // Keyboard: Down and Up move, Right opens the color submenu on the current choice, Left comes back.
   menu.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+  expect(w.document.activeElement).toBe(menuItem(w, 'quality-checks'));
+  menu.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
   expect(w.document.activeElement).toBe(menuItem(w, 'remove'));
+  menu.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
   menu.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
   expect(w.document.activeElement).toBe(menuItem(w, 'color'));
   menu.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
@@ -1777,6 +1780,30 @@ it('offers a new chat beside a project\'s menu, and its color as a submenu and r
   w.document.body.dispatchEvent(new w.Event('pointerdown', { bubbles: true }));
   (w.document.querySelector(`.project-heading > [data-new-project="${project.id}"]`) as HTMLButtonElement).click(); await settle();
   expect((w.document.getElementById('chatInput') as HTMLTextAreaElement).placeholder).toBe('Message in Workspace…');
+});
+
+it('edits a project\'s quality checks in a dialog, one command per line, and shows how many are set', async () => {
+  const project = { id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', name: 'Workspace', path: 'C:\\workspace\\primary', createdAt: 1 };
+  const { w } = await boot([], false, [], [project]);
+  const api = (w as any).api;
+  api.setProjectQualityChecks = vi.fn(async (_id: string, checks: string[]) => ({ ok: true, data: { ...project, ...(checks.length ? { qualityChecks: checks } : {}) } }));
+  projectMenu(w, project.id);
+  menuItem(w, 'quality-checks').click(); await settle();
+  const dialog = () => w.document.querySelector<HTMLDialogElement>('.quality-checks-dialog');
+  const field = () => dialog()!.querySelector('textarea')!;
+  expect(field().value).toBe('');
+  field().value = 'node "unterminated';
+  dialog()!.querySelector('form')!.dispatchEvent(new w.Event('submit', { cancelable: true }));
+  expect(api.setProjectQualityChecks).not.toHaveBeenCalled();
+  expect(dialog()).not.toBeNull();
+  field().value = ' npm test \n\nnpm run typecheck';
+  dialog()!.querySelector('form')!.dispatchEvent(new w.Event('submit', { cancelable: true })); await settle();
+  expect(api.setProjectQualityChecks).toHaveBeenCalledWith(project.id, ['npm test', 'npm run typecheck']);
+  expect(dialog()).toBeNull();
+  projectMenu(w, project.id);
+  expect(menuItem(w, 'quality-checks').textContent).toContain('2');
+  menuItem(w, 'quality-checks').click(); await settle();
+  expect(field().value).toBe('npm test\nnpm run typecheck');
 });
 
 it('picks and clears project color without changing project membership', async () => {

@@ -904,7 +904,8 @@ it; it finds its row's button again by owner (`data-row-menu`), stays inside the
 submenus beside their item, and is keyboard-driven (arrows, Right/Left for submenus, Escape gives
 focus back to the button). A project's menu: New chat in this project (`data-new-project`, which
 also shows the chat screen), Color (a submenu: None and the palette as radio items, each calling
-the same `projects:color` owner; choices wait while a save is pending) and Remove. A chat's
+the same `projects:color` owner; choices wait while a save is pending), Quality checks (a dialog,
+one command per line, with the count as the item's hint) and Remove. A chat's
 menu: Rename and Open in browser, Block/Release and, in strict mode, Trust/Untrust, then Remove;
 the Unattributed row offers only its app-wide Block/Allow (never in strict mode) and Remove.
 Choosing an item gives focus back to the row's button before the action runs, so a color save's
@@ -960,22 +961,24 @@ remain explicit steps.
 
 **Quality checks (#1296).** A project may hold up to 8 check commands (project menu → Quality
 checks). They are plain argv lines, never shell syntax, and saving a non-empty list requires a
-main-process confirmation that names every command and defaults to Cancel; the renderer or a
-model cannot set them alone. When a worker of that project calls `agents action=finish`, the app
-runs the checks one at a time in the worker's own marker-verified worktree (never the Prime's
-checkout), revalidating the lease before each command. The run is anchored to the candidate's
-content identity: HEAD, index and the bytes of every changed tracked or untracked non-ignored
-file. A check that changes that identity fails the run, and a run's result applies only to the
-exact identity and command list it ran with. Finish waits briefly; while checks still run it is
-refused with their progress, and the worker calls finish again. The first failed run on a
-candidate refuses the finish with each failing command's exit status and output tail, so the
-worker can fix it. Finishing again on the same unchanged candidate is accepted and its report
-leads with an app-written failure line, so a worker is never stuck and the Prime never reads a
-failure as a pass. A passed run leads the report with the commands, the commit and whether
-uncommitted changes were included. A worker without a verified isolated worktree finishes with a
-"not run" line. Results are process-local; after a restart the checks run again. Checks prove
-only that these commands exited 0 on this candidate, not that its scripts are honest; the
-orphan sweep's app-owned finish never claims a check result.
+main-process confirmation that names every command and defaults to Cancel; the renderer or a model
+cannot set them alone. When a worker of that project calls `agents action=finish`, the app runs the
+checks one at a time in the worker's own marker-verified worktree (never the Prime's checkout),
+revalidating the lease before each command; each gets the 5-minute command limit and `CI=1`, and
+one worker never has two runs at once. The run is anchored to the candidate's content identity:
+HEAD, index and the bytes of every changed tracked or untracked non-ignored file. A check that
+changes that identity fails the run, and a run's result applies only to the exact identity and
+command list it ran with. Finish waits briefly; while checks still run it is refused with their
+progress, and the worker calls finish again. The first failed run on a candidate stops at the first
+failing command and refuses the finish with its exit status and output tail, so the worker can fix
+it. Finishing again on the same unchanged candidate is accepted and its report leads with an
+app-written failure line, so a worker is never stuck and the Prime never reads a failure as a pass.
+A passed run leads the report with the commands, the commit and whether uncommitted changes were
+included. A worker without a verified isolated worktree finishes with a "not run" line. Results are
+process-local; after a restart the checks run again. Checks prove only that these commands exited 0
+on this candidate, not that its scripts are honest; the orphan sweep's app-owned finish never
+claims a check result.
+
 Compaction keeps local session/project identity and moves frontend workspace projection. A
 relative path without owned workspace fails; a workspace never grants permission by itself.
 An absolute approved path teaches an unresolved request its project. Subsequent relative paths

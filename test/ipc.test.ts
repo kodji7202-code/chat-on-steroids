@@ -509,6 +509,18 @@ it('adds picker-selected projects, reuses containing approval, and leaves cancel
   const uncolored = await handlers.get('projects:color')!(null, { id: first.data.id, color: null }) as any;
   expect(uncolored).toMatchObject({ ok: true, data: { id: first.data.id } });
   expect(uncolored.data.color).toBeUndefined();
+  const setChecks = (checks: string[]) => handlers.get('projects:quality-checks')!(null, { id: first.data.id, checks }) as Promise<any>;
+  vi.mocked(dialog.showMessageBox).mockClear().mockResolvedValueOnce({ response: 0 } as never);
+  expect(await setChecks(['npm test'])).toMatchObject({ ok: true, data: null });
+  expect(dialog.showMessageBox).toHaveBeenCalledWith(expect.objectContaining({ defaultId: 0, cancelId: 0, detail: expect.stringContaining('npm test') }));
+  expect((await handlers.get('projects:list')!(null, {}) as any).data.find((row: any) => row.id === first.data.id).qualityChecks).toBeUndefined();
+  vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ response: 1 } as never);
+  expect(await setChecks([' npm test ', ''])).toMatchObject({ ok: true, data: { qualityChecks: ['npm test'] } });
+  expect(await setChecks(['node "unterminated'])).toMatchObject({ ok: false });
+  vi.mocked(dialog.showMessageBox).mockClear();
+  const cleared = await setChecks([]);
+  expect(cleared.data.qualityChecks).toBeUndefined();
+  expect(dialog.showMessageBox).not.toHaveBeenCalled();
   const removed = await handlers.get('projects:remove')!(null, { id: first.data.id }) as any;
   expect(removed).toMatchObject({ ok: true, data: { id: first.data.id, ungrouped: true } });
   expect(getConfig().roots).toHaveLength(1);

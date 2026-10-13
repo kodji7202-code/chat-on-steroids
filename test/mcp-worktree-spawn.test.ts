@@ -13,6 +13,7 @@ import { registerCoreTools } from '../src/main/mcp/tools-core.js';
 import { initSessionStore, resetSessionStoreForTests } from '../src/main/session/store.js';
 import { resetWorkspaces, setWorkspaceFor } from '../src/main/workspace.js';
 import * as worktrees from '../src/main/worktrees/index.js';
+import * as projects from '../src/main/projects.js';
 import { DEFAULT_CAPABILITIES } from '../src/shared/types.js';
 
 describe('MCP worker spawn with automatic Git isolation', () => {
@@ -65,6 +66,10 @@ describe('MCP worker spawn with automatic Git isolation', () => {
   });
 
   function spawn(workers: Array<{ task: string }>): Promise<ToolResult> {
+    return callAgents({ action: 'spawn', workers }, primeConversation, null);
+  }
+
+  function callAgents(input: Record<string, unknown>, conversationId: string, sessionId: string | null): Promise<ToolResult> {
     const ctx: ToolContext = {
       roots: getConfig().roots,
       caps: { ...DEFAULT_CAPABILITIES, command: true, create: true, edit: true },
@@ -74,7 +79,7 @@ describe('MCP worker spawn with automatic Git isolation', () => {
       exposedFinishTool: false
     };
     const registrar = createRegistrar(null, ctx, 'core');
-    let handler: ((input: { action: 'spawn'; workers: Array<{ task: string }> }) => Promise<ToolResult>) | undefined;
+    let handler: ((input: Record<string, unknown>) => Promise<ToolResult>) | undefined;
     registrar.register = ((name, _config, callback) => {
       if (name === 'agents') handler = callback as typeof handler;
     }) as typeof registrar.register;
@@ -84,16 +89,41 @@ describe('MCP worker spawn with automatic Git isolation', () => {
       startedAt: Date.now(),
       transportKey: null,
       agent: null,
-      caller: { transportKey: null, requestId: null, conversationId: primeConversation, sessionId: null },
+      caller: { transportKey: null, requestId: null, conversationId, sessionId },
       outcome: null,
       evidence: emptyEvidence()
     };
-    return runInCallContext(call, () => handler!({ action: 'spawn', workers }));
+    return runInCallContext(call, () => handler!(input));
   }
 
   function selectedGitSource(): void {
     setWorkspaceFor(`chat:${primeConversation}`, { real: repository, virtual: '/approved/project' });
   }
+
+  it('runs the project quality checks in the worker checkout before it accepts the finish', async () => {
+    selectedGitSource();
+    const allocation = vi.spyOn(worktrees, 'allocWorkerWorkspace');
+    const spawned = await spawn([{ task: 'Fix tracked.txt' }]);
+    const lease = await allocation.mock.results[0]?.value;
+    const workerConversation = 'mcp-worktree-spawn-worker';
+    expect(agents.bindConversation('worker-1', workerConversation, (spawned.structuredContent as { run_id: string }).run_id)).toBe(true);
+    const script = path.join(temp, 'quality-check.cjs');
+    await fs.writeFile(script, "process.exit(require('fs').readFileSync('tracked.txt', 'utf8').includes('fixed') ? 0 : 3);");
+    vi.spyOn(projects, 'getSessionQualityChecks').mockResolvedValue([`"${process.execPath}" "${script}"`]);
+    const staged = vi.spyOn(agents, 'stageFinishAgent');
+    const finish = () => callAgents({ action: 'finish', result: 'Fixed it.' }, workerConversation, 'worker-session');
+
+    const refused = await finish();
+    expect(refused.isError).toBe(true);
+    expect(refused.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('exited with 3') });
+    expect(staged).not.toHaveBeenCalled();
+
+    await fs.writeFile(path.join(lease!.workspace.real, 'tracked.txt'), 'fixed\n');
+    const accepted = await finish();
+    expect(accepted.isError).not.toBe(true);
+    expect(staged.mock.calls[0]?.[1]).toMatch(/^\[Quality checks passed\] .+ with uncommitted changes\.\n\nFixed it\.$/);
+    expect(await fs.readFile(path.join(repository, 'tracked.txt'), 'utf8')).toBe('committed\n');
+  });
 
   it('admits ordinary workers without a workspace despite autoWorktrees being enabled', async () => {
     const allocation = vi.spyOn(worktrees, 'allocWorkerWorkspace');

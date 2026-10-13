@@ -374,16 +374,16 @@ async function safeTrackedIndexFlags(root: string): Promise<Buffer> {
   return data;
 }
 
-async function cleanupContentFingerprint(root: string, inspected?: DetailedWorkerWorktreeStatus): Promise<string> {
+async function cleanupContentFingerprint(root: string, inspected?: DetailedWorkerWorktreeStatus, includeIgnored = true): Promise<string> {
   const initialIndexFlags = await safeTrackedIndexFlags(root);
-  const initial = await statusOf(root, true);
+  const initial = await statusOf(root, includeIgnored);
   if (initial.truncated || (inspected && JSON.stringify(initial) !== JSON.stringify(inspected))) {
     throw new WorkerWorktreeError('WORKTREE_FINGERPRINT_UNAVAILABLE', 'Git status changed or was truncated during cleanup inspection');
   }
   const index = await runGit(root, ['diff', '--cached', '--raw', '-z', 'HEAD', '--'], 1024 * 1024);
   if (index.code !== 0) throw new WorkerWorktreeError('WORKTREE_FINGERPRINT_UNAVAILABLE', 'staged Git changes could not be inspected');
   const hash = createHash('sha256');
-  hash.update('cos-worktree-cleanup-v1\0');
+  hash.update(includeIgnored ? 'cos-worktree-cleanup-v1\0' : 'cos-worker-candidate-v1\0');
   hash.update(initial.headOid);
   hash.update('\0tracked-index-flags\0');
   hash.update(initialIndexFlags);
@@ -503,7 +503,7 @@ async function cleanupContentFingerprint(root: string, inspected?: DetailedWorke
     await scan(filename, 0, kind === 'tracked');
   }
   const [final, finalIndex, finalIndexFlags] = await Promise.all([
-    statusOf(root, true), runGit(root, ['diff', '--cached', '--raw', '-z', 'HEAD', '--'], 1024 * 1024),
+    statusOf(root, includeIgnored), runGit(root, ['diff', '--cached', '--raw', '-z', 'HEAD', '--'], 1024 * 1024),
     safeTrackedIndexFlags(root)
   ]);
   if (final.truncated || JSON.stringify(initial) !== JSON.stringify(final) ||
@@ -1184,6 +1184,19 @@ export async function inspectWorkerWorkspaceForCleanup(lease: WorkerWorktreeLeas
     ignoredFiles: status.ignoredFiles, changesTruncated: status.truncated,
     blockers, canOfferRemoval: blockers.length === 0
   };
+}
+
+/**
+ * Content identity of a worker's candidate: HEAD, index and the bytes of every changed tracked or
+ * untracked file. Ignored files (build output, dependencies) are left out so that running a check
+ * does not by itself change the identity it is checking.
+ */
+export async function workerCandidateIdentity(lease: WorkerWorktreeLease): Promise<{ identity: string; headOid: string; dirty: boolean }> {
+  const marker = await assertOwnedWorktree(lease);
+  const status = await statusOf(marker.worktreePath);
+  if (status.truncated) throw new WorkerWorktreeError('WORKTREE_FINGERPRINT_LIMIT', 'too many changed files to identify the candidate');
+  const identity = await cleanupContentFingerprint(marker.worktreePath, undefined, false);
+  return { identity, headOid: status.headOid, dirty: status.dirty };
 }
 
 async function patchOrTruncated(cwd: string, args: readonly string[]): Promise<{ patch: string | null; truncated: boolean }> {

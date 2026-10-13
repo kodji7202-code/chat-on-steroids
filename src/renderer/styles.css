@@ -4211,6 +4211,8 @@ select option::checkmark { order: 1; margin-inline-start: auto; color: var(--ink
 .file-entry-dialog-input:focus { outline: 2px solid var(--ink); outline-offset: 2px; }
 .file-entry-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .file-entry-dialog-actions .btn { padding: 8px 12px; }
+.quality-checks-dialog { width: min(480px, calc(100vw - 32px)); }
+.quality-checks-dialog textarea { resize: vertical; font-family: var(--mono); line-height: 1.5; }
 .file-confirm-dialog-body { display: grid; gap: 12px; padding: 20px; }
 .file-confirm-dialog-body h2 { margin: 0; font-size: calc(16px * var(--text-scale, 1)); font-weight: 650; }
 .file-confirm-dialog-message { margin: 0; color: var(--ink); font-size: calc(13px * var(--text-scale, 1)); line-height: 1.5; overflow-wrap: anywhere; }

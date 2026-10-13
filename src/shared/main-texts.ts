@@ -25,6 +25,10 @@ export const MAIN_TEXTS = [
   'Send an automatic Goal or write your next instruction.',
   'Send Automatic Goal',
   'Write Directly',
+  'Run these quality checks in worker checkouts?',
+  'Workers must pass these commands before they finish. They run with your permissions, without a shell.',
+  'Save checks',
+  'Cancel',
   'The Chat On Steroids browser is still running',
   'Your chats keep going. Choose Show browser in the tray icon’s menu to bring it back.',
   'Your chats keep going. Choose Show browser in the menu bar icon’s menu to bring it back.'

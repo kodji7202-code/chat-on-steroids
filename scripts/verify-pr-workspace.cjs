@@ -83,6 +83,7 @@ app.whenReady().then(async () => {
           baseText:'# Demo workspace\\n',currentText:'# Demo workspace\\n\\nUpdated in the working tree.\\n'}),
         attachProjectFile:(id,name)=>{window.fixtureAttached.push({id,name});return ok({id:'file-1',name,size:12,mimeType:'text/plain'});},
         saveProjectFile:(id,name,text)=>{files[name]=text;window.fixtureSaves.push({id,name,text});return ok({preview:info(id,name)});},
+        setProjectQualityChecks:(id,checks)=>{const project=projects.find(p=>p.id===id);project.qualityChecks=checks;return ok({...project});},
         writeClipboard:()=>ok(true),connect:()=>{state.status.state='connected';return ok(state)},disconnect:()=>{state.status.state='disconnected';return ok(state)}
       },{get:(target,key)=>key in target?target[key]:String(key).startsWith('on')?()=>()=>{}:()=>ok(null)});
       await import('/main.ts');
@@ -128,6 +129,19 @@ app.whenReady().then(async () => {
     assert.ok(await js(`(()=>{const button=document.getElementById('chatRefresh');const heading=button.closest('.sidebar-session-heading');const a=button.getBoundingClientRect(),b=heading.getBoundingClientRect();return button.children.length===1&&Math.abs((a.top+a.bottom-b.top-b.bottom)/2)<1})()`));
     assert.equal(await js('document.querySelectorAll("#projectList .sess[data-id]").length'),2);
     assert.equal(await js('document.querySelectorAll("#chatList .sess[data-id]").length'),1);
+    await js(`document.querySelector('.project-group[data-project-id="project-a"] .project-menu').click()`);
+    await until(`!!document.querySelector('.row-menu [data-row-action="quality-checks"]')`);
+    await screenshot('project-quality-checks-menu');
+    await js(`document.querySelector('.row-menu [data-row-action="quality-checks"]').click()`);
+    await until(`!!document.querySelector('.quality-checks-dialog textarea')`);
+    await js(`document.querySelector('.quality-checks-dialog textarea').value='npm test\\nnpm run typecheck'`);
+    await screenshot('project-quality-checks-dialog');
+    await js(`document.querySelector('.quality-checks-dialog form').requestSubmit()`);
+    await until(`!document.querySelector('.quality-checks-dialog')`);
+    await js(`document.querySelector('.project-group[data-project-id="project-a"] .project-menu').click()`);
+    await until(`document.querySelector('.row-menu [data-row-action="quality-checks"]')?.textContent.includes('2')`);
+    await js(`document.body.dispatchEvent(new Event('pointerdown',{bubbles:true}))`);
+    await until(`!document.querySelector('.row-menu')`);
     await js(`document.querySelector('.sess[data-id="task-0"]').click()`);
     await until('!document.querySelector("#workDockRight .work-dock-quick[data-view=files]").disabled');
     await js(`document.getElementById('rightDockToggle').click()`);

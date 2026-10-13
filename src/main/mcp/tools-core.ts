@@ -34,8 +34,9 @@ import {
 import { logInfo, logWarn } from '../logger.js';
 import { SandboxError, isAbsoluteVirtualPath, isNativeWindowsPath, resolvePath, strayVirtualPath } from '../sandbox.js';
 import { currentWorkspace, primeWorkspace, setWorkspaceFor } from '../workspace.js';
-import { getSessionProject } from '../projects.js';
-import { allocWorkerWorkspace, validateWorkerWorkspaceLease, WorkerWorktreeError, type WorkerWorktreeLease } from '../worktrees/index.js';
+import { getSessionProject, getSessionQualityChecks } from '../projects.js';
+import { gateWorkerFinish } from '../quality-gate.js';
+import { allocWorkerWorkspace, lookupWorkerWorkspace, validateWorkerWorkspaceLease, WorkerWorktreeError, type WorkerWorktreeLease } from '../worktrees/index.js';
 import type { Capabilities, Root } from '../../shared/types.js';
 import { commandHasSameArguments, evaluateCommandAllowlist } from '../../shared/command-allowlist.js';
 import type { FileChange } from '../../shared/session.js';
@@ -1620,7 +1621,10 @@ function registerAgentsTool(reg: SurfaceRegistrar): void {
               'agents action=finish requires result: the report the prime reads in your place — what you changed, what you verified and what is left. Send it as result and call finish again.'
             );
           }
-          const staged = stageFinishAgent(await callerNow(startedAt, { runId: input.run_id, member: true }), input.result);
+          const finishCaller = await callerNow(startedAt, { runId: input.run_id, member: true });
+          const gate = await finishQualityGate(finishCaller);
+          if (gate?.kind === 'refuse') return fail(gate.text);
+          const staged = stageFinishAgent(finishCaller, gate ? `${gate.preface}\n\n${input.result}` : input.result);
           if (!staged.repeat) {
             await acceptAgentMutation(staged,
               'The worker finish could not cross its durable acceptance barrier. Nothing was published; retry the same finish result.');
@@ -1744,6 +1748,20 @@ function registerAgentsTool(reg: SurfaceRegistrar): void {
       });
     }
   );
+}
+
+/** Only a live worker's own finish runs its project's checks; a repeated finish of a stopped one publishes nothing. */
+async function finishQualityGate(caller: Caller): ReturnType<typeof gateWorkerFinish> {
+  let self: ReturnType<typeof statusForCaller>['self'];
+  try { self = statusForCaller(caller).self; } catch { return null; }
+  const agentId = self?.id;
+  const sessionId = currentCall()?.caller.sessionId;
+  if (self?.role !== 'worker' || !agentId || !['invited', 'active', 'detached'].includes(self.state) || !sessionId) return null;
+  const checks = await getSessionQualityChecks(sessionId);
+  if (!checks.length) return null;
+  const allocation = managedWorkerAllocationIdentity(caller);
+  const lease = allocation?.agentId === agentId ? lookupWorkerWorkspace(allocation) : null;
+  return gateWorkerFinish({ lease, checks, roots: getConfig().roots });
 }
 
 /**

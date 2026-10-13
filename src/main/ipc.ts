@@ -2,7 +2,7 @@ import { registerWorkspaceTerminalIpc } from './workspace-terminal-ipc.js';
 import { registerDictationIpc } from './dictation.js';
 import { CONNECTOR_SUFFIX_MAX, CONNECTOR_SUFFIX_PATTERN } from '../shared/connector-names.js';
 import { setStopNoticeTranslations } from './stuck-notice.js';
-import { setMainTextTranslations } from './main-texts.js';
+import { mainText, setMainTextTranslations } from './main-texts.js';
 import { applyLoginStartup, supportsLoginStartup } from './window-lifecycle.js';
 import { startControlApi, stopControlApi } from './control-api.js';
 import { appearanceSchema } from './appearance-schema.js';
@@ -81,7 +81,8 @@ import type { WorkerWorktreeCleanupOffer } from '../shared/session.js';
 import { unifiedExecManager } from './codex/manager.js';
 import { inFlightToolCalls } from './mcp/call-context.js';
 import { RESERVED_ROOT_NAMES, uniqueRootName, validateNewRoot, SandboxError, resolvePath } from './sandbox.js';
-import { addProject, expireArmedProjectCreates, getSessionProject, listProjects, onProjectLinkChange, projectWorkspace, removeProject, retryProjectCreate, setProjectColor } from './projects.js';
+import { addProject, expireArmedProjectCreates, getProject, getSessionProject, listProjects, onProjectLinkChange, projectWorkspace, removeProject, retryProjectCreate, setProjectColor, setProjectQualityChecks } from './projects.js';
+import { MAX_QUALITY_CHECK_CHARS, MAX_QUALITY_CHECKS, normalizeQualityChecks } from '../shared/quality-checks.js';
 import { createProjectEntry, listProjectDirectory, previewProjectFile, projectFileTarget, renameProjectEntry, revalidateProjectFileTarget, saveProjectTextFile } from './project-files.js';
 import { ProjectFileWatchSet } from './project-file-watcher.js';
 import { ProjectGitWatchSet, readProjectGitDiff, readProjectGitSnapshot } from './project-git.js';
@@ -920,6 +921,32 @@ export function registerIpc(getWindow: () => BrowserWindow | null, quitToInstall
     const { id } = z.object({ id: z.string().uuid() }).strict().parse(payload);
     const project = await retryProjectCreate(id);
     if (project) wakeBrowserWork();
+    push('session:changed');
+    return project;
+  });
+  handle('projects:quality-checks', async payload => {
+    const { id, checks } = z.object({
+      id: z.string().uuid(), checks: z.array(z.string().max(MAX_QUALITY_CHECK_CHARS * 2)).max(MAX_QUALITY_CHECKS * 4)
+    }).strict().parse(payload);
+    const normalized = normalizeQualityChecks(checks);
+    if ('error' in normalized) throw new Error(normalized.error);
+    const current = (await getProject(id))?.qualityChecks ?? [];
+    if (JSON.stringify(current) === JSON.stringify(normalized.checks)) return getProject(id);
+    // Commands that will run later are approved here, in main, never by a renderer boolean.
+    if (normalized.checks.length) {
+      const { response } = await dialog.showMessageBox({
+        type: 'warning',
+        title: mainText('Run these quality checks in worker checkouts?'),
+        message: mainText('Run these quality checks in worker checkouts?'),
+        detail: `${mainText('Workers must pass these commands before they finish. They run with your permissions, without a shell.')}\n\n${normalized.checks.join('\n')}`,
+        buttons: [mainText('Cancel'), mainText('Save checks')],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true
+      });
+      if (response !== 1) return null;
+    }
+    const project = await setProjectQualityChecks(id, normalized.checks);
     push('session:changed');
     return project;
   });

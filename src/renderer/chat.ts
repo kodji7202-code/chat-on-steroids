@@ -40,6 +40,7 @@ import { injectableAttachments, queuedFollowup, MAX_INPUT_IMAGES } from '../shar
 import type { InputArgs, InputEntry } from '../main/session/input.js';
 import type { DictationEvent } from '../shared/dictation.js';
 import { PROJECT_COLORS, type LocalProject, type ProjectColor } from '../shared/projects.js';
+import { normalizeQualityChecks } from '../shared/quality-checks.js';
 import type { TaskProgress } from '../shared/task-progress.js';
 import type { RunningExecProcess } from '../shared/background-exec.js';
 /**
@@ -198,6 +199,12 @@ function projectMenuItems(id: string): RowMenuItem[] {
       }))
     },
     {
+      action: 'quality-checks', icon: 'i-steps', label: () => t('Quality checks'),
+      title: () => t('Commands a worker must pass before it can finish'), disabled: savingQualityChecks.has(id),
+      hint: () => String(projects.find(row => row.id === id)?.qualityChecks?.length || ''),
+      run: () => void editQualityChecks(id)
+    },
+    {
       action: 'remove', icon: 'i-trash', danger: true, separated: true, disabled: removingProject.has(id),
       label: () => t('Remove'), title: () => t('Remove project from sidebar; keep conversations and files'),
       run: () => void removeProjectFromSidebar(id)
@@ -273,6 +280,76 @@ async function removeProjectFromSidebar(id: string): Promise<void> {
     paintSessions(); void refreshInputQueue();
     toast(t('Project removed; conversations kept'));
   } finally { removingProject.delete(id); }
+}
+
+const savingQualityChecks = new Set<string>();
+async function editQualityChecks(id: string): Promise<void> {
+  const current = projects.find(row => row.id === id)?.qualityChecks ?? [];
+  if (savingQualityChecks.has(id)) return;
+  const checks = await requestQualityChecks(current);
+  if (!checks || savingQualityChecks.has(id)) return;
+  savingQualityChecks.add(id);
+  try {
+    // Null: the user kept the previous checks in the main-process confirmation, or saving failed.
+    const updated = await run(api.setProjectQualityChecks(id, checks));
+    if (!updated) return;
+    ++sessionsLoadGeneration;
+    projects = projects.map(row => row.id === id ? updated : row);
+    paintSessions();
+    toast(updated.qualityChecks?.length ? t('Quality checks saved') : t('Quality checks turned off'));
+  } finally { savingQualityChecks.delete(id); }
+}
+
+function requestQualityChecks(current: readonly string[]): Promise<string[] | null> {
+  document.querySelector('.quality-checks-dialog')?.remove();
+  return new Promise(resolve => {
+    const box = document.createElement('dialog');
+    box.className = 'file-entry-dialog quality-checks-dialog';
+    const form = document.createElement('form');
+    form.className = 'file-entry-dialog-form';
+    form.noValidate = true;
+    const field = el('label', 'file-entry-dialog-field');
+    const input = document.createElement('textarea');
+    input.className = 'file-entry-dialog-input';
+    input.rows = 5;
+    input.spellcheck = false;
+    input.placeholder = 'npm test\nnpm run typecheck';
+    input.value = current.join('\n');
+    field.append(el('span', '', () => t('One command per line')), input,
+      el('small', '', () => t('Before a worker of this project finishes, each command runs in its own checkout, without a shell. Leave empty to turn checks off.')));
+    const actions = el('div', 'file-entry-dialog-actions');
+    const cancel = el('button', 'btn', () => t('Cancel')) as HTMLButtonElement;
+    cancel.type = 'button';
+    const save = el('button', 'btn btn-solid', () => t('Save')) as HTMLButtonElement;
+    save.type = 'submit';
+    actions.append(cancel, save);
+    form.append(el('h2', '', () => t('Quality checks')), field, actions);
+    box.append(form);
+    document.body.append(box);
+    let settled = false;
+    const finish = (value: string[] | null): void => {
+      if (settled) return;
+      settled = true;
+      box.remove();
+      resolve(value);
+    };
+    cancel.addEventListener('click', () => finish(null));
+    box.addEventListener('cancel', event => { event.preventDefault(); finish(null); });
+    input.addEventListener('input', () => input.setCustomValidity(''));
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      const normalized = normalizeQualityChecks(input.value.split('\n'));
+      if ('error' in normalized) {
+        input.setCustomValidity(t('Use up to 8 lines, each a program and its arguments.'));
+        input.reportValidity();
+        return;
+      }
+      finish(normalized.checks);
+    });
+    if (typeof box.showModal === 'function') box.showModal();
+    else box.setAttribute('open', '');
+    input.focus();
+  });
 }
 
 /** A project color as people say it, in the interface language. */

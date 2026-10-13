@@ -27,6 +27,11 @@ export function mainTexts(): Record<MainText, string> {
     'Send an automatic Goal or write your next instruction.': t('Send an automatic Goal or write your next instruction.'),
     'Send Automatic Goal': t('Send Automatic Goal'),
     'Write Directly': t('Write Directly'),
+    'Run these quality checks in worker checkouts?': t('Run these quality checks in worker checkouts?'),
+    'Workers must pass these commands before they finish. They run with your permissions, without a shell.':
+      t('Workers must pass these commands before they finish. They run with your permissions, without a shell.'),
+    'Save checks': t('Save checks'),
+    'Cancel': t('Cancel'),
     'The Chat On Steroids browser is still running': t('The Chat On Steroids browser is still running'),
     'Your chats keep going. Choose Show browser in the tray icon’s menu to bring it back.':
       t('Your chats keep going. Choose Show browser in the tray icon’s menu to bring it back.'),

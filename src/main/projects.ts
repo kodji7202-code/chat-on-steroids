@@ -7,6 +7,7 @@ import { getConfig } from './config.js';
 import { nativePathIdentity, resolvePath } from './sandbox.js';
 import { bindSessionProject, findSessionByConversation, getSession } from './session/store.js';
 import { CHATGPT_PROJECT_ID, PROJECT_COLORS, type ChatgptProjectLink, type LocalProject, type ProjectColor } from '../shared/projects.js';
+import { MAX_QUALITY_CHECK_CHARS, MAX_QUALITY_CHECKS, normalizeQualityChecks } from '../shared/quality-checks.js';
 
 const at = z.number().finite().nonnegative();
 const requestId = z.string().uuid();
@@ -22,7 +23,8 @@ const projectSchema = z.object({
   id: z.string().uuid(), name: z.string().min(1).max(160), path: z.string().min(1).max(32768),
   color: z.enum(PROJECT_COLORS).optional(),
   createdAt: z.number().finite().nonnegative(), ungrouped: z.boolean().optional(),
-  chatgpt: chatgptSchema.optional()
+  chatgpt: chatgptSchema.optional(),
+  qualityChecks: z.array(z.string().min(1).max(MAX_QUALITY_CHECK_CHARS)).max(MAX_QUALITY_CHECKS).optional()
 });
 const catalogSchema = z.array(projectSchema).max(200);
 let mutations: Promise<unknown> = Promise.resolve();
@@ -82,6 +84,24 @@ export function setProjectColor(projectId: string, color: ProjectColor | null): 
   return operation;
 }
 
+/** Callers must already hold the user's main-process confirmation for a non-empty list. */
+export function setProjectQualityChecks(projectId: string, lines: readonly string[]): Promise<LocalProject> {
+  const operation = mutations.then(async () => {
+    z.string().uuid().parse(projectId);
+    const normalized = normalizeQualityChecks(lines);
+    if ('error' in normalized) throw new Error(normalized.error);
+    const projects = await listProjects();
+    const project = projects.find(row => row.id === projectId);
+    if (!project) throw new Error('Project not found');
+    const { qualityChecks: _, ...without } = project;
+    const updated: LocalProject = normalized.checks.length ? { ...without, qualityChecks: normalized.checks } : without;
+    await writeDurableNow('projects', projects.map(row => row.id === projectId ? updated : row));
+    return updated;
+  });
+  mutations = operation.catch(() => undefined);
+  return operation;
+}
+
 /** Remove only the grouping. One catalog commit also covers unloaded sessions and
  * in-flight inputs without rewriting their durable workspace/receipt identities. */
 export function removeProject(id: string): Promise<LocalProject> {
@@ -120,6 +140,11 @@ export async function getSessionProject(sessionId: string): Promise<{ virtual: s
   const project = await getProject(session.projectId);
   if (!project) throw new Error('The session project is unavailable');
   return resolveProject(project);
+}
+/** A worker session inherits its Prime's project, and with it that project's checks. */
+export async function getSessionQualityChecks(sessionId: string): Promise<string[]> {
+  const session = await getSession(sessionId);
+  return (session?.projectId ? (await getProject(session.projectId))?.qualityChecks : undefined) ?? [];
 }
 /** The broker supplies an exact prime conversation; unrelated families are never consulted. */
 export async function inheritSessionProject(sessionId: string, primeConversationId: string): Promise<void> {
